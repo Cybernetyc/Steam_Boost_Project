@@ -5,7 +5,7 @@
 #include "../Inc/7_seg_driver.h"
 #include <string.h>
 
-/* Коды сегментов для цифр 0..9 (общий шаблон; соответствие битам зависит от разводки) */
+/* Segment codes for digits (generic pattern; actual bit mapping depends on PCB wiring) */
 static const uint8_t digits_code[] = {
   [0] = 0x3F,
   [1] = 0x06,
@@ -30,39 +30,49 @@ static const uint8_t symbols_code[] = {
   [6] = 0x74, // h
 };
 
+/**
+ * @brief Initializes the structure that describes the 7-segment indicator.
+ * @param seg7_handle      Pointer to the 7-segment indicator handle structure.
+ * @param digit_ports      Array of GPIO port pointers controlling the digit transistors.
+ * @param digit_pins       Array of GPIO pins controlling the digit transistors.
+ * @param segment_port     GPIO port used for the indicator segments.
+ * @param segment_pin_mask Bitmask specifying active bits of the segment port.
+ * @retval None
+ */
 void Seg7_Init(
   Seg7_Handle_t* seg7_handle,
   GPIO_TypeDef*  digit_ports[],
   const uint16_t digit_pins[],
   GPIO_TypeDef*  segment_port,
-  uint16_t       segment_pin_mask
-)
+  uint16_t       segment_pin_mask )
 {
-  /* Обнуляем весь хэндл (на случай если он не был = {0}) */
-  memset(seg7_handle, 0, sizeof(*seg7_handle));
+  memset(seg7_handle, 0, sizeof(*seg7_handle));     /// Set input struct in 0
 
   seg7_handle->segment_port     = segment_port;
   seg7_handle->segment_pin_mask = segment_pin_mask;
 
   for (size_t i = 0; i < NUMBER_OF_DIG; ++i) {
-    seg7_handle->digit_ports[i] = digit_ports[i];
-    seg7_handle->digit_pins[i]  = digit_pins[i];
+    seg7_handle->digit_ports[i] = digit_ports[i];  /// Rewrite digit ports
+    seg7_handle->digit_pins[i]  = digit_pins[i];   /// Rewrite digit pins
   }
 }
 
-/* Выравнивание по правому краю. При input_number == 0 показываем '0' в младшем разряде. */
+/**
+ * @brief Converts a numeric value into segment patterns to be displayed on the 7-segment indicator.
+ * @param seg7_handle   - Pointer to the 7-segment indicator handle structure.
+ * @param input_number  - Number to convert
+ */
 void Seg7_SetNumber(Seg7_Handle_t* seg7_handle, uint16_t input_number)
 {
-  /* Чистим буфер шаблонов (все разряды гасим) */
+  /* Clear the digit buffer (turn all segments off) */
   memset(seg7_handle->digit_buf, 0, sizeof(seg7_handle->digit_buf));
 
-  /* Отдельный случай: число = 0 */
-  if (input_number == 0) {
-    seg7_handle->digit_buf[NUMBER_OF_DIG - 1] = digits_code[0];
+  /// Special case: input value is zero
+  if (input_number == 0)
     return;
-  }
 
-  /* Разложение числа справа-налево (младшие -> правые разряды) */
+
+  /* Decompose the number from right to left (least significant digit goes to the rightmost position)  */
   for (int8_t i = (int8_t)NUMBER_OF_DIG - 1; i >= 0 && input_number != 0; --i) {
     seg7_handle->digit_buf[i] = digits_code[input_number % 10];
     input_number /= 10;
