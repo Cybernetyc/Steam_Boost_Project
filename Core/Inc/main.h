@@ -79,6 +79,8 @@ void Error_Handler(void);
 #define Q2_GPIO_Port GPIOB
 #define Q3_Pin GPIO_PIN_2
 #define Q3_GPIO_Port GPIOB
+#define K1_Pin GPIO_PIN_10
+#define K1_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

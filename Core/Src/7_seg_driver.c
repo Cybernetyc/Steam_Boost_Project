@@ -51,9 +51,9 @@ void Seg7_Init(
   seg7_handle->segment_port     = segment_port;
   seg7_handle->segment_pin_mask = segment_pin_mask;
 
-  for (size_t i = 0; i < NUMBER_OF_DIG; ++i) {
+  for (int8_t i = 0; i < NUMBER_OF_DIG; ++i) {
     seg7_handle->digit_ports[i] = digit_ports[i];  /// Rewrite digit ports
-    seg7_handle->digit_pins[i]  = digit_pins[i];   /// Rewrite digit pins
+    seg7_handle->digit_pins [i] = digit_pins [i];  /// Rewrite digit pins
   }
 }
 
@@ -64,17 +64,43 @@ void Seg7_Init(
  */
 void Seg7_SetNumber(Seg7_Handle_t* seg7_handle, uint16_t input_number)
 {
-  /* Clear the digit buffer (turn all segments off) */
+  /* Clear the digit buffer (turn all segments off) */ /// Тут попробовать убрать
   memset(seg7_handle->digit_buf, 0, sizeof(seg7_handle->digit_buf));
 
   /// Special case: input value is zero
-  if (input_number == 0)
+  if (input_number == 0){
+    seg7_handle->digit_buf[NUMBER_OF_DIG - 1] = digits_code[0];
     return;
-
+  }
 
   /* Decompose the number from right to left (least significant digit goes to the rightmost position)  */
   for (int8_t i = (int8_t)NUMBER_OF_DIG - 1; i >= 0 && input_number != 0; --i) {
     seg7_handle->digit_buf[i] = digits_code[input_number % 10];
     input_number /= 10;
   }
+}
+
+
+void Seg7_UpdateIndicator(Seg7_Handle_t *seg7_handle)
+{
+  /// Off all digits а нужно ли выключать все цифры ?
+  for (int8_t i = 0; i < NUMBER_OF_DIG; ++i)
+    seg7_handle->digit_ports[i]->BSRR = (uint32_t)seg7_handle->digit_pins[i] << 16;
+
+  /// Перезапишу в отдельную переменную чтобы проще было работать.
+  uint8_t current_digit = seg7_handle->current_digit;
+
+  /// Очистим биты порта , отвечающие за вывод символа через маску.
+  seg7_handle->segment_port->ODR &= ~seg7_handle->segment_pin_mask;
+
+  /// Запишем биты порта, отвечающие за вывод символа, требуемый символ через маску
+  seg7_handle->segment_port->ODR |= seg7_handle->digit_buf[current_digit] & seg7_handle->segment_pin_mask;
+
+  /// Включаем текущий транзистор на отображение
+  seg7_handle->digit_ports[current_digit]->BSRR = (uint32_t)(seg7_handle->digit_pins[current_digit]);
+
+  /// Увеличивем значение символа в структуре в пределах количества символов для последующих вызовов
+  seg7_handle->current_digit++;
+  if (seg7_handle->current_digit >= NUMBER_OF_DIG)
+    seg7_handle->current_digit = 0;
 }

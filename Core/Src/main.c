@@ -18,11 +18,13 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "tim.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "7_seg_driver.h"
+#include "State_Machine.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -39,8 +41,9 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+
 /* USER CODE BEGIN PV */
-Seg7_Handle_t seg7_handle = {0};
+volatile Seg7_Handle_t seg7_handle = {0};
 
 GPIO_TypeDef* digit_ports[NUMBER_OF_DIG] = {
   [0] = Q1_GPIO_Port,
@@ -56,6 +59,20 @@ uint16_t digit_pins[NUMBER_OF_DIG] = {
 
 /* Порт сегментов: весь порт A отдан под сегменты (как ты описывал) */
 GPIO_TypeDef* segment_port = GPIOA;
+
+
+MachineState_Context_t Machine_State = {
+  .machine_state = STATE_READY,
+  .valve_state   = CLOSED,
+  .cfg_sec       = DEFAULT_TIME,
+  .cur_sec       = 0
+};
+
+MachineEvent_t Machine_Event = EVENT_NONE;
+
+
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -73,7 +90,9 @@ void SystemClock_Config(void);
   */
 int main(void)
 {
+
   /* USER CODE BEGIN 1 */
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -92,21 +111,52 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
   Seg7_Init(&seg7_handle, digit_ports, digit_pins, segment_port, 0xFF);
 
-  /* Пример заполнения: выведем число 123 (буфер подготовится) */
-  Seg7_SetNumber(&seg7_handle, 123);
+  Seg7_SetNumber(&seg7_handle, Machine_State.cfg_sec);
+
+  Seg7_UpdateIndicator(&seg7_handle);
+  HAL_TIM_Base_Start(&htim3);
+
+  uint32_t last_tick_ms = 0U; /// Служебная переменная время последнего обновления
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    /*if (__HAL_TIM_GET_FLAG(&htim3, TIM_FLAG_UPDATE))
+    {
+      __HAL_TIM_CLEAR_FLAG(&htim3, TIM_FLAG_UPDATE); */
+    if (TIM3->SR & TIM_SR_UIF)
+    {
+      TIM3->SR &= ~TIM_SR_UIF;
+      Seg7_UpdateIndicator(&seg7_handle);
+    }
+
+    if (HAL_GPIO_ReadPin(K1_GPIO_Port, K1_Pin) == GPIO_PIN_SET)
+    {
+      //HAL_Delay(20);  // антидребезг (у тебя аппаратный, но немного софтовый не повредит)
+      if (HAL_GPIO_ReadPin(K1_GPIO_Port, K1_Pin) == GPIO_PIN_SET)
+      {
+        Machine_Process(&Machine_State, EVENT_BTN_SHRT_PRESS);
+      }
+      while (HAL_GPIO_ReadPin(K1_GPIO_Port, K1_Pin) == GPIO_PIN_SET);
+    }
+
+    /// 2️⃣ Проверяем, прошла ли секунда
+    if (HAL_GetTick() - last_tick_ms >= 1000)
+    {
+      last_tick_ms = HAL_GetTick();
+      Machine_Process(&Machine_State, EVENT_TICK_1S);
+    }
+
+    /// 3️⃣ Обновляем динамическую индикацию
+   // Seg7_UpdateIndicator(&seg7_handle);
     /* USER CODE END WHILE */
-    Seg7_SetNumber(&seg7_handle, 123);
-    /* Здесь пока пусто: динамическая индикация будет через TIM IRQ (Seg7_Update) */
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -157,7 +207,7 @@ void SystemClock_Config(void)
 /* USER CODE END 4 */
 
 /**
-  * @brief  This function is executed in case of an error occurrence.
+  * @brief  This function is executed in case of error occurrence.
   * @retval None
   */
 void Error_Handler(void)
@@ -169,7 +219,6 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-
 #ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number

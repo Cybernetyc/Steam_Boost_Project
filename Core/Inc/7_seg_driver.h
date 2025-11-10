@@ -39,5 +39,6 @@ void Seg7_Init(
 
 /// Заполнение буфера сегментов по числу (выравнивание по правому краю)
 void Seg7_SetNumber(Seg7_Handle_t* seg7_handle, uint16_t input_number);
+void Seg7_UpdateIndicator(Seg7_Handle_t *seg7_handle);
 
 #endif // INC_7_SEG_7_SEG_DRIVER_H

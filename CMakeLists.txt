@@ -34,7 +34,8 @@ enable_language(C ASM)
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME}
         Core/Src/7_seg_driver.c
-        Core/Inc/7_seg_driver.h)
+        Core/Inc/7_seg_driver.h
+        Core/Src/State_Machine.c)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
