@@ -29,6 +29,10 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef enum{
+  RELEASED = 0,
+  PUSH = 1
+} BUTTON_STATE_t;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -71,8 +75,6 @@ MachineState_Context_t Machine_State = {
 MachineEvent_t Machine_Event = EVENT_NONE;
 
 
-
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -81,7 +83,114 @@ void SystemClock_Config(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
+
 /* USER CODE BEGIN 0 */
+
+//--- Настройка сканера ---
+#define BTN_DEBOUNCE_MS (20)    /// Антридребезг: сколько мс подряд уровень должен быть неизменным
+#define BTN_LONG_MS     (1000)  /// Порог длительного нажатия МС
+
+//--- Контекст кнопки ---
+typedef struct {
+  BUTTON_STATE_t  state     ; /// Текущее подтверждённое (после дебаунса) состояние кнопки: 1 - нажата. 0 - отпущена
+  uint8_t         long_state ; /// Флаг - длинное нажатие уже создано в этом удержании, чтобы не дублировать.
+  uint16_t        stable_time_ms ; /// Время мс подряд "сырое" чтение не менялось (доказательство стабильности)
+  uint16_t        hold_ms   ; /// Длительность текущего удержания (считаем только когда state == 1)
+} BtnCtx;
+
+static BtnCtx Button = {0}; /// Инициализировали переменную кнопка
+
+
+/// СЫРОЕ чтение GPIO: Возвращаем состояние кнопки, НАЖАТА или ОТПУЩЕНА.
+/// Если кнопка у меня активный НУЛЬ - инвертируем (== GPIO_PIN_RESET)
+static inline BUTTON_STATE_t Butt_State_Read(void)
+{
+  return HAL_GPIO_ReadPin(K1_GPIO_Port, K1_Pin) == SET ? PUSH : RELEASED;
+}
+
+/// Опрос раз в 1 мс. Возвращаем одно событие либо EVENT_NONE
+/// Логика. Ключевые моменты
+/// Prev_raw : "что было в прошлую мс" (для подсчёта подряд идущих одинаковых выборок)
+/// stable_time_ms : Счётчик - растёт, если raw НЕ меняется; сбрасывается при смене raw
+/// Как только stable_time_ms ДОШЁЛ до порога BUTTON_DEBOUNCE_MS - фиксируем новое state-состояние
+/// и генерируем переход (SHORT на отпускании без LONG, или старт удержания).
+///
+/// Чтобы не триггерить повторно на каждом тике (вызове функции), сразу после срабатывания
+/// проталкиваем счётчик ЗА порог (stable_time_ms++) - это делает событие одноразовым на данный фронт.
+///
+static MachineEvent_t Button_Poll_1ms(void)
+{
+  static BUTTON_STATE_t Prev_State;
+  const  BUTTON_STATE_t Curr_State = Butt_State_Read();
+
+  static BUTTON_STATE_t Init_State = 0;
+
+  if (!Init_State){                      /// Инициализация начального состояния кнопки
+    Prev_State            = Curr_State;
+    Button.state          = Curr_State;   ///Стартовое подтверждённое состояние такое как сейчас
+    Button.stable_time_ms = 0;
+    Button.hold_ms        = 0;
+    Button.long_state     = 0;
+    Init_State            = 1;            /// Init State off
+    return EVENT_NONE;
+  }
+
+  /// 1) Накопление "подряд одинаковых выборок" или сброс при изменении
+  if (Curr_State == Prev_State)
+  {
+    if (Button.stable_time_ms < BTN_DEBOUNCE_MS)
+      Button.stable_time_ms++;
+  }
+  else
+  {                            /// Обнаружили переход состояния кнопки
+    Prev_State = Curr_State;   /// Выровняли состояния
+    Button.stable_time_ms = 0; /// Занулили счётчик подсчёт стабильного состояния кнопки
+  }
+
+  MachineEvent_t event = EVENT_NONE;
+
+  /// 2) Отрабатываем программный антидребезг после фиксации состояния
+
+  if (Button.stable_time_ms == BTN_DEBOUNCE_MS)     /// Если прошёл программынй антидребезг
+  {
+    if (Button.state != Curr_State)
+    {
+      Button.state = Curr_State;         /// Фиксируем текущий уровень как стабильный
+
+      if (Button.state == PUSH)          /// Если кнопка стабильно нажата
+      {
+        Button.hold_ms = 0;              /// Занулили счётчик удержания для последующего использования
+        Button.long_state = 0;           /// Занулили состояние длинного удержания
+      }
+      else                               /// Иначе кнопка стабильно отпущена
+      {
+        if (!Button.long_state)          /// Если состояние длинного удержания нет
+          event = EVENT_BTN_SHRT_PRESS;  /// Значит удержание короткое
+
+        Button.hold_ms = 0;              /// Занулили счётчик удержания
+        Button.long_state = 0;
+      }
+    }
+    Button.stable_time_ms++;           /// Проталкиваем счётчика за порог,
+  }                                    /// чтобы не перегенерировать событие
+
+
+  /// 3) Пока подтверждено НАЖАТО - копим удержание, и при достижении порога, выдаём LONG - 1 раз
+  if (Button.state == PUSH)
+  {
+    if (Button.hold_ms < 0xFFFF)
+      Button.hold_ms++;
+
+    if ( Button.hold_ms >= BTN_LONG_MS && Button.long_state == 0)
+    {
+      Button.long_state = 1;
+      event = EVENT_BTN_LONG_PRESS; /// Сработает ровно один раз за удержание
+    }
+  }
+
+  return event;
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -118,43 +227,40 @@ int main(void)
   Seg7_SetNumber(&seg7_handle, Machine_State.cfg_sec);
 
   Seg7_UpdateIndicator(&seg7_handle);
-  HAL_TIM_Base_Start(&htim3);
+  HAL_TIM_Base_Start_IT(&htim3);
 
   uint32_t last_tick_ms = 0U; /// Служебная переменная время последнего обновления
+
+  uint32_t last_ms =     HAL_GetTick();  /// Для 1мс - сканера
+  uint32_t last_tick1s = HAL_GetTick();  /// Для 1с - тика автомата
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /*if (__HAL_TIM_GET_FLAG(&htim3, TIM_FLAG_UPDATE))
-    {
-      __HAL_TIM_CLEAR_FLAG(&htim3, TIM_FLAG_UPDATE); */
-    if (TIM3->SR & TIM_SR_UIF)
-    {
-      TIM3->SR &= ~TIM_SR_UIF;
-      Seg7_UpdateIndicator(&seg7_handle);
-    }
+    uint32_t now = HAL_GetTick();
 
-    if (HAL_GPIO_ReadPin(K1_GPIO_Port, K1_Pin) == GPIO_PIN_SET)
+    /// --- Кнопка:  строгие 1 мс шаги; "догоняем', если главный цикл задержался ---///
+    while (last_ms != now)
     {
-      //HAL_Delay(20);  // антидребезг (у тебя аппаратный, но немного софтовый не повредит)
-      if (HAL_GPIO_ReadPin(K1_GPIO_Port, K1_Pin) == GPIO_PIN_SET)
+      last_ms++;
+      const MachineEvent_t current_event = Button_Poll_1ms();
+
+      if (current_event != EVENT_NONE)
       {
-        Machine_Process(&Machine_State, EVENT_BTN_SHRT_PRESS);
+        Machine_Process(&Machine_State, current_event);
       }
-      while (HAL_GPIO_ReadPin(K1_GPIO_Port, K1_Pin) == GPIO_PIN_SET);
+
     }
 
-    /// 2️⃣ Проверяем, прошла ли секунда
-    if (HAL_GetTick() - last_tick_ms >= 1000)
-    {
-      last_tick_ms = HAL_GetTick();
+    /// --- Секундный тик автомата ---
+    if ((now - last_tick1s) >= 1000){
+      last_tick1s += 1000;  /// Не приравнять к NOW, а прибавить 1000
       Machine_Process(&Machine_State, EVENT_TICK_1S);
     }
 
-    /// 3️⃣ Обновляем динамическую индикацию
-   // Seg7_UpdateIndicator(&seg7_handle);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -204,6 +310,11 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if (htim->Instance == TIM3)
+    Seg7_UpdateIndicator(&seg7_handle);
+}
 /* USER CODE END 4 */
 
 /**

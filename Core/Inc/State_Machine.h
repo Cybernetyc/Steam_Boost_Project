@@ -10,8 +10,9 @@
 #define DEFAULT_TIME  (3) /// This is the default time value for cfg_sec in Machine_State_Context
 
 typedef enum {
-  STATE_READY = 0,       /// The device is waiting for the button to be pressed
-  STATE_COUNTDOWN = 1    /// Countdown after pressing the button
+  STATE_READY     = 0,   /// The device is waiting for the button to be pressed
+  STATE_COUNTDOWN = 1,   /// Countdown after pressing the button
+  STATE_CONFIG    = 2    /// Config for countdown seconds
 } MachineState_t;        /// Machine condition
 
 typedef enum {
@@ -29,7 +30,7 @@ typedef struct {
 typedef enum {
   EVENT_NONE = 0,             /// None event (default)
   EVENT_BTN_SHRT_PRESS = 1,   /// Short button press
-//EVENT_BTN_LONG_PRESS = 2,   /// Пока что закомментировал, но использую позже
+  EVENT_BTN_LONG_PRESS = 2,   /// Пока что закомментировал, но использую позже
   EVENT_TICK_1S        = 3    /// One-second TIMER TICK
 } MachineEvent_t;
 

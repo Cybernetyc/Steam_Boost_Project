@@ -8,7 +8,8 @@
 #include <stdint.h>
 #include "stm32f401xc.h"
 
-#define NUMBER_OF_DIG 3  // Кол-во разрядов
+#define NUMBER_OF_DIG (3)      // Кол-во разрядов
+#define SEG7_DP_BIT   (0x80u)  //
 
 /**
  * @brief Структура для описания семисегментного индикатора
@@ -40,5 +41,6 @@ void Seg7_Init(
 /// Заполнение буфера сегментов по числу (выравнивание по правому краю)
 void Seg7_SetNumber(Seg7_Handle_t* seg7_handle, uint16_t input_number);
 void Seg7_UpdateIndicator(Seg7_Handle_t *seg7_handle);
+void Seg7_SetDP (Seg7_Handle_t * seg7_handle, uint8_t digit_index, uint8_t on);
 
 #endif // INC_7_SEG_7_SEG_DRIVER_H

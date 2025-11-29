@@ -68,16 +68,19 @@ void Seg7_SetNumber(Seg7_Handle_t* seg7_handle, uint16_t input_number)
   memset(seg7_handle->digit_buf, 0, sizeof(seg7_handle->digit_buf));
 
   /// Special case: input value is zero
-  if (input_number == 0){
+  if (input_number == 0)
+  {
     seg7_handle->digit_buf[NUMBER_OF_DIG - 1] = digits_code[0];
     return;
   }
 
   /* Decompose the number from right to left (least significant digit goes to the rightmost position)  */
-  for (int8_t i = (int8_t)NUMBER_OF_DIG - 1; i >= 0 && input_number != 0; --i) {
+  for (int8_t i = (int8_t)NUMBER_OF_DIG - 1; i >= 0 && input_number != 0; --i)
+  {
     seg7_handle->digit_buf[i] = digits_code[input_number % 10];
     input_number /= 10;
   }
+
 }
 
 
@@ -85,7 +88,9 @@ void Seg7_UpdateIndicator(Seg7_Handle_t *seg7_handle)
 {
   /// Off all digits а нужно ли выключать все цифры ?
   for (int8_t i = 0; i < NUMBER_OF_DIG; ++i)
+  {
     seg7_handle->digit_ports[i]->BSRR = (uint32_t)seg7_handle->digit_pins[i] << 16;
+  }
 
   /// Перезапишу в отдельную переменную чтобы проще было работать.
   uint8_t current_digit = seg7_handle->current_digit;
@@ -102,5 +107,26 @@ void Seg7_UpdateIndicator(Seg7_Handle_t *seg7_handle)
   /// Увеличивем значение символа в структуре в пределах количества символов для последующих вызовов
   seg7_handle->current_digit++;
   if (seg7_handle->current_digit >= NUMBER_OF_DIG)
+  {
     seg7_handle->current_digit = 0;
+  }
+
+}
+
+void Seg7_SetDP (Seg7_Handle_t * seg7_handle,const uint8_t digit_index, uint8_t on)
+{
+  if (digit_index >= NUMBER_OF_DIG)
+  {
+    return;
+  }
+
+  if (on)
+  {
+    seg7_handle->digit_buf[digit_index] |= SEG7_DP_BIT;
+  }
+  else
+  {
+    seg7_handle->digit_buf[digit_index] &= (uint8_t)~SEG7_DP_BIT;
+  }
+
 }
