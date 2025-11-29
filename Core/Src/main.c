@@ -25,6 +25,7 @@
 /* USER CODE BEGIN Includes */
 #include "7_seg_driver.h"
 #include "State_Machine.h"
+#include "AppFlashConfig.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -190,6 +191,7 @@ static MachineEvent_t Button_Poll_1ms(void)
 
   return event;
 }
+
 
 /* USER CODE END 0 */
 
