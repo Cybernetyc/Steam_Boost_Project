@@ -36,7 +36,7 @@ void Machine_Process (MachineState_Context_t* ctx, const MachineEvent_t event)
     case STATE_READY:
       if (event == EVENT_BTN_SHRT_PRESS)
       {
-        ctx->machine_state = STATE_COUNTDOWN; /// 1. Перейти в состояние COUNTDOWN
+        ctx->machine_state = STATE_COUNTDOWN; /// 1. Перейти в состояние обратного отсчёта
         ctx->cur_sec       = ctx->cfg_sec;    /// 2. Установить cur_sec = cfg_sec
         ctx->valve_state   = OPEN;            /// 3. Контекст состояния клапана - ОТКРЫТ
         Valve_Set(OPEN);          /// 4. ОТКРЫТЬ клапан
