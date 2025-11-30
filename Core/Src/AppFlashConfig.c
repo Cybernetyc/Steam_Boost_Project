@@ -149,7 +149,8 @@ HAL_StatusTypeDef APP_Save_CFG_Flash(void)
   GlobalAppConfig.reserved_1  = 0u;
   GlobalAppConfig.reserved_2  = 0u;
 
-  /// 1. Если данные уже лежат во Flash, то ничего не копируем
+  // 2. Проверка необходимости записи: избегаем избыточного программирования Flash.
+  //    Получаем указатель на текущую конфигурацию во Flash-памяти.
   AppFlashConfig_t const *CurFlashConfig = APP_Get_CFG_Addr();
 
   if (APP_Check_CFG_Valid(CurFlashConfig) == VALID &&
