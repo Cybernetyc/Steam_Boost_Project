@@ -60,23 +60,43 @@ static validate APP_Check_CFG_Valid(const AppFlashConfig_t *config)
   return VALID;
 }
 
-/// Стирание памяти 5-го сектора. Всё в 0xFF
+/**
+ * @brief   Стирает сектор Flash памяти, где хранится конфигурация
+ * @details Выполняет полное стирание указанного сектора Flash-памяти.\n
+ * Перед операцией сбрасывает флаги ошибок предыдущих операций Flash.
+ * @retval HAL_StatusTypedef - статус операции стирания.
+ */
 static HAL_StatusTypeDef APP_Erase_CFG_Flash(void)
 {
-  uint32_t Error = 0;
-  FLASH_EraseInitTypeDef EraseInitStruct = {0};
+  uint32_t Error = 0;                                      // Переменная для хранения кода ошибки
+  FLASH_EraseInitTypeDef EraseInitStruct = {0};            // Структура инициализации стирания
 
-  /// Настройка параметров стирания сектора Flash памяти
-  EraseInitStruct.TypeErase    = FLASH_TYPEERASE_SECTORS;  /// Тип стирания - секторами
-  EraseInitStruct.Sector       = FLASH_CFG_SECTOR;         /// Номер сектора ( определён в хедере )
-  EraseInitStruct.NbSectors    = 1;                        /// Стираем только 1 сектор
-  EraseInitStruct.VoltageRange = FLASH_CFG_VRANGE;         /// Диапазон напряжений
+  // Настройка параметров стирания сектора Flash памяти
+  EraseInitStruct.TypeErase    = FLASH_TYPEERASE_SECTORS;  // Тип стирания - секторами (не страницами)
+  EraseInitStruct.Sector       = FLASH_CFG_SECTOR;         // Номер сектора (определён в заголовке)
+  EraseInitStruct.NbSectors    = 1;                        // Стираем только 1 сектор
+  EraseInitStruct.VoltageRange = FLASH_CFG_VRANGE;         // Диапазон напряжений
 
-  __HAL_FLASH_CLEAR_FLAG( FLASH_FLAG_EOP    | FLASH_FLAG_OPERR  |
-                          FLASH_FLAG_WRPERR | FLASH_FLAG_PGAERR |
-                          FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR )
+  /**
+   * @brief Очистка флагов статуса Flash перед началом новой операции
+   * @details Критически важный шаг для предотвращения ложного определения ошибок:
+   * гарантия, что мы начинаем операцию с "чистого листа"
+   */
+  __HAL_FLASH_CLEAR_FLAG(
+    FLASH_FLAG_EOP    |  // Флаг окончания операции ....................... (End Of Operation)
+    FLASH_FLAG_OPERR  |  // Флаг ошибки операции .......................... (Operation Error)
+    FLASH_FLAG_WRPERR |  // Флаг ошибки защиты от записи .................. (Write Protection Error)
+    FLASH_FLAG_PGAERR |  // Флаг ошибки выравнивания программирования ..... (Programming Alignment Error)
+    FLASH_FLAG_PGPERR |  // Флаг ошибки программирования .................. (Programming Error)
+    FLASH_FLAG_PGSERR )  // Флаг ошибки последовательности программирования (Programming Sequence Error)
   ;
 
+  /**
+   * @brief Выполнение операции стирания Flash-памяти
+   * @param &EraseInitStruct - указатель на структуру с параметрами стирания
+   * @param &Error - указатель на переменную для сохранения детального кода ошибки.
+   * @retval Hal_StatusTypeDef - Общий статус операции
+   */
   return HAL_FLASHEx_Erase(&EraseInitStruct, &Error);
 }
 
@@ -119,7 +139,6 @@ static HAL_StatusTypeDef APP_Write_CFG_Flash(const AppFlashConfig_t *input_confi
   return HAL_OK;
 }
 
-
 /**
  * @brief Сохраняет конфигурацию во Flash-память
  * @details Выполняет полный цикл сохранения:\n
@@ -133,14 +152,15 @@ static HAL_StatusTypeDef APP_Write_CFG_Flash(const AppFlashConfig_t *input_confi
  */
 HAL_StatusTypeDef APP_Save_CFG_Flash(void)
 {
-  /// 0. Защита диапазона и инверсия - на всякий случай
+  // 1. Подготовка данных: установка защитных полей и граничных значений.
+  //    Обеспечим корректный диапазон для основного параметра конфигурации.
   if (GlobalAppConfig.cfg_sec < APP_CFG_SEC_MIN)
   {
-      GlobalAppConfig.cfg_sec = APP_CFG_SEC_MIN;
+    GlobalAppConfig.cfg_sec = APP_CFG_SEC_MIN;  // Защита нижней границы
   }
   if (GlobalAppConfig.cfg_sec > APP_CFG_SEC_MAX)
   {
-    GlobalAppConfig.cfg_sec = APP_CFG_SEC_MAX;
+    GlobalAppConfig.cfg_sec = APP_CFG_SEC_MAX;  // Защита верхней границы
   }
   //Установка защитных и служебных полей структуры
   GlobalAppConfig.cfg_sec_inv = ~GlobalAppConfig.cfg_sec; // Инверсная копия для контроля целостности данных
@@ -153,66 +173,71 @@ HAL_StatusTypeDef APP_Save_CFG_Flash(void)
   //    Получаем указатель на текущую конфигурацию во Flash-памяти.
   AppFlashConfig_t const *CurFlashConfig = APP_Get_CFG_Addr();
 
+  // Если данные во Flash идентичны подготовленным - пропускаем запись.
+  // Тем самым продлевая срок службы Flash-памяти.
   if (APP_Check_CFG_Valid(CurFlashConfig) == VALID &&
       memcmp(CurFlashConfig, &GlobalAppConfig, sizeof(GlobalAppConfig)) == 0)
   {
-    return HAL_OK;
+    return HAL_OK; // Данные актуальные - запись не требуется.
   }
 
-  /// 2. На время erase программ выключаем TIM3-IRQ (мультиплекс) и делаем участок атомарным*/
-  // extern TIM_HandleTypeDef htim3;
+  // 3. Подготовка критической секции: атомарный участок кода
+  // На время erase программ выключаем TIM3-IRQ (мультиплекс) и запрещаем прерывания
   HAL_TIM_Base_Stop_IT(&htim3);
   __disable_irq();
 
-  /// 3. Разблокируем FLASH для последующей операции над ним */
+  // 4.   Работа с памятью
+  // 4.1. Разблокировка Flash для последующих операций стирания и записи данных
   HAL_StatusTypeDef App_CurrStatus = HAL_FLASH_Unlock();
 
-  /// В случае неудачи восстанавливаем прерывания и запускаем таймер для мультиплексирования
+  // Обработка ошибки разблокировки: восстанавливаем систему и выходим
   if (App_CurrStatus != HAL_OK)
   {
-    __enable_irq();
-    HAL_TIM_Base_Start_IT(&htim3);
-    return App_CurrStatus;
+    __enable_irq();                // Разрешаем прерывания
+    HAL_TIM_Base_Start_IT(&htim3); // Запускаем таймер мультиплексирования
+    return App_CurrStatus;         // Возвращаем статус ошибки
   }
 
+  // 4.2. Стираем целевой сектор Flash-памяти
   App_CurrStatus = APP_Erase_CFG_Flash();
+
+  // Если стирание прошло без ошибок - записываем новую конфигурацию
   if (App_CurrStatus == HAL_OK)
   {
     App_CurrStatus = APP_Write_CFG_Flash(&GlobalAppConfig);
   }
 
-  /// Если успешно стёрли и записали
-  (void)HAL_FLASH_Lock();
-  __enable_irq();
-  HAL_TIM_Base_Start_IT(&htim3);
+  // 4.3. Завершение работы с памятью: блокировка и восстановление системы
+  (void)HAL_FLASH_Lock();         // Блокируем Flash для защиты от случайных изменений
+  __enable_irq();                 // Восстанавливаем прерывания
+  HAL_TIM_Base_Start_IT(&htim3);  // Запускаем таймер для мультиплексирования
 
-  /// Быстрая верификация
-  if (App_CurrStatus == HAL_OK && APP_Check_CFG_Valid(APP_Get_CFG_Addr())!= VALID)
+  // 5. Финальная верификация: проверка валидности записанных данных
+  if (App_CurrStatus == HAL_OK &&
+      APP_Check_CFG_Valid(APP_Get_CFG_Addr())!= VALID)
   {
-    App_CurrStatus = HAL_ERROR;
+    App_CurrStatus = HAL_ERROR; // Данные повреждены или не прошли проверку валидности
   }
 
-  return App_CurrStatus; /// Вернули текущий статус
+  return App_CurrStatus; /// Вернули итоговой статус операции
 }
 
 /**
- * @brief Загружает конфигурационные данные из Flash.\n\n
+ * @brief Загрузка конфигурационных данных из Flash-памяти.
  *
- * Если данные конфигурации во Flash памяти валидны,\n
- * они копируются в глобальную переменную `GlobalAppConfig`\n
+ * @details В случае валидности данных -
+ * загрузка из Flash в глобальную переменную структуру GlobalAppConfig.\n\n
+ * Иначе инициализация конфигурации значениями по умолчанию в глобальную переменную GlobalAppConfig.\n
+ * И после её запись во Flash-память.
  *
- * В случае невалидных данных выполняется инициализация\n
- * конфигурации значениями по умолчанию. Затем конфигурация\n
- * сохраняется во флеш для последующего использования.\n
- *
- * Алгоритм включает следующие этапы:
+ * Функция включает следующие этапы:
  * - Извлечение указателя на текущую конфигурацию из Flash.
  * - Проверка валидности извлеченных данных.
  * - В случае валидности    - копирование данных в глобальную переменную.
  * - В случае не валидности - инициализация конфигурации значениями по умолчанию
  *   и сохранение в память.
  */
-void APP_Load_CFG(void)
+void APP_Load_CFG_Flash(void)
 {
     const AppFlashConfig_t *flashConfig = APP_Get_CFG_Addr();
 

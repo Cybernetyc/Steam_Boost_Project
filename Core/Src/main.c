@@ -225,7 +225,7 @@ int main(void)
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
-  APP_Load_CFG();
+  APP_Load_CFG_Flash();
 
   Machine_State.cfg_sec = GlobalAppConfig.cfg_sec;
 

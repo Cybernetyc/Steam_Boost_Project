@@ -113,6 +113,6 @@ extern AppFlashConfig_t GlobalAppConfig;
 
 /** Прототипы функций **/
 HAL_StatusTypeDef APP_Save_CFG_Flash(void);
-void APP_Load_CFG(void);
+void APP_Load_CFG_Flash(void);
 
 #endif // INC_7_SEG_APPFLASHCONFIG_H //
