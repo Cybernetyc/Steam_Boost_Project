@@ -142,9 +142,10 @@ HAL_StatusTypeDef APP_Save_CFG_Flash(void)
   {
     GlobalAppConfig.cfg_sec = APP_CFG_SEC_MAX;
   }
-  GlobalAppConfig.cfg_sec_inv = ~GlobalAppConfig.cfg_sec;
-  GlobalAppConfig.magic       = APP_CFG_MAGIC;
-  GlobalAppConfig.version     = APP_CFG_VERSION;
+  //Установка защитных и служебных полей структуры
+  GlobalAppConfig.cfg_sec_inv = ~GlobalAppConfig.cfg_sec; // Инверсная копия для контроля целостности данных
+  GlobalAppConfig.magic       = APP_CFG_MAGIC;            // Версия структуры конфигурации
+  GlobalAppConfig.version     = APP_CFG_VERSION;          // Обнуление резервных полей
   GlobalAppConfig.reserved_1  = 0u;
   GlobalAppConfig.reserved_2  = 0u;
 
