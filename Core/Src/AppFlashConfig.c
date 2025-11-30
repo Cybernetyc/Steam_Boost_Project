@@ -41,7 +41,33 @@ static inline const AppFlashConfig_t* flash_cfg(void)
   return (const AppFlashConfig_t*)APP_CFG_ADDR;
 }
 
+/* Запись:
+    1. Остановили мультиплекс
+    2. UNLOCK   FLASH
+    3. ERASE    FLASH
+    4. PROGRAMM FLASH
+    5. LOCK     FLASH */
+HAL_StatusTypeDef AppFlash_SaveConfig(void)
+{
+  /* 0. Защита диапазона и инверсия - на всякий случай */
+  if (GlobalAppConfig.cfg_sec < APP_CFG_SEC_MIN)
+  {
+    GlobalAppConfig.cfg_sec = APP_CFG_SEC_MIN;
+  }
+  if (GlobalAppConfig.cfg_sec > APP_CFG_SEC_MAX)
+  {
+    GlobalAppConfig.cfg_sec = APP_CFG_SEC_MAX;
+  }
+  GlobalAppConfig.cfg_sec_inv = ~GlobalAppConfig.cfg_sec;
+  GlobalAppConfig.magic       = APP_CFG_MAGIC;
+  GlobalAppConfig.version     = APP_CFG_VERSION;
+  GlobalAppConfig.reserved_1  = 0u;
+  GlobalAppConfig.reserved_2  = 0u;
 
+
+
+  return 0;
+}
 
 /**
  * @brief Загружает конфигурационные данные из Flash.\n\n
@@ -76,6 +102,6 @@ void AppFlash_LoadConfig(void)
     GlobalAppConfig.cfg_sec_inv = ~GlobalAppConfig.cfg_sec;
     GlobalAppConfig.reserved_1  = 0u;
     GlobalAppConfig.reserved_2  = 0u;
-    (void)AppFlash_SaveConfig();
+    (void)AppFlash_SaveConfig();       /// Первый старт прошивки или битый блок - записали дефолтное значение
   }
 }

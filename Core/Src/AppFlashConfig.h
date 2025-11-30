@@ -25,6 +25,7 @@
  *
  */
 
+#include "stm32f4xx_hal_def.h"
 #include "State_Machine.h"
 #include <stdint.h>
 
