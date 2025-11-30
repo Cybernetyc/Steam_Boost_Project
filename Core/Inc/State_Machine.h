@@ -5,21 +5,50 @@
 #ifndef INC_7_SEG_STATE_MACHINE_H
 #define INC_7_SEG_STATE_MACHINE_H
 
+/** Подключение заголовочных файлов */
 #include "stdint.h"
+#include "stm32f4xx_hal_gpio.h"
 
-#define DEFAULT_TIME  (3) /// This is the default time value for cfg_sec in Machine_State_Context
+/** Частные макроопределения */
 
+/** -- Значения по умолчанию -- */
+#define DEFAULT_TIME  (3)               // Значение времени по умолчанию для cfg_sec в Machine_State_Context
+
+/** -- Макроопределения для клапана -- */
+#define VALVE_GPIO_PORT (GPIOB)         // Порт клапана
+#define VALVE_GPIO_PIN  (GPIO_PIN_13)   // Пин клапана
+
+/** Перечисления */
+
+/** -- Состояния машины -- */
+
+/**
+ * @brief Перечисление состояний машины
+ */
 typedef enum {
-  STATE_READY     = 0,   /// The device is waiting for the button to be pressed
-  STATE_COUNTDOWN = 1,   /// Countdown after pressing the button
-  STATE_CONFIG    = 2    /// Config for countdown seconds
-} MachineState_t;        /// Machine condition
+  STATE_READY     = 0,   // Готовность. Ожидание внешнего события
+  STATE_COUNTDOWN = 1,   // Обратного отсчёта.
+  STATE_CONFIG    = 2    // Конфигурация.
+} MachineState_t;        // Состояние машины
 
+/** -- События машины -- */
 typedef enum {
-  CLOSED = 0,            /// Valve is closed
-  OPEN   = 1             /// Valve is open
-} Valve_State_t;         /// Valve condition
+  EVENT_NONE = 0,             // Нет события (по-умолчанию)
+  EVENT_BTN_SHRT_PRESS = 1,   // Короткое нажатие кнопки
+  EVENT_BTN_LONG_PRESS = 2,   // Долгое нажатие кнопки
+  EVENT_TICK_1S        = 3    // 1-секундный тик таймера
+} MachineEvent_t;             // Событие для машины состояний
 
+/** -- Положение клапана -- */
+typedef enum {
+  CLOSED = 0,                 // Клапан закрыт
+  OPEN   = 1                  // Клапана открыт
+} Valve_State_t;              // Состояние клапана
+
+
+/** Структуры */
+
+/** -- Структура контекста состояния машины -- */
 typedef struct {
   MachineState_t machine_state;  /// Current condition of the machine
   Valve_State_t  valve_state  ;  /// Valve flag state
@@ -27,13 +56,14 @@ typedef struct {
   uint8_t cur_sec ;              /// Current value of seconds
 } MachineState_Context_t;        /// Context of Machine State
 
-typedef enum {
-  EVENT_NONE = 0,             /// None event (default)
-  EVENT_BTN_SHRT_PRESS = 1,   /// Short button press
-  EVENT_BTN_LONG_PRESS = 2,   /// Пока что закомментировал, но использую позже
-  EVENT_TICK_1S        = 3    /// One-second TIMER TICK
-} MachineEvent_t;
 
-void Machine_Process (MachineState_Context_t* ctx, const MachineEvent_t event);
+
+/** -- Прототипы функций -- */
+void Machine_Process (MachineState_Context_t* ctx, MachineEvent_t event);
+
+static inline void Valve_Set (const Valve_State_t Valve_state)
+{
+  HAL_GPIO_WritePin(VALVE_GPIO_PORT, VALVE_GPIO_PIN, (Valve_state ? GPIO_PIN_SET : GPIO_PIN_RESET));
+}
 
 #endif //INC_7_SEG_STATE_MACHINE_H

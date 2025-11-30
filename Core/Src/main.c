@@ -48,7 +48,7 @@ typedef enum{
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-volatile Seg7_Handle_t seg7_handle = {0};
+/*volatile*/ Seg7_Handle_t seg7_handle = {0};
 
 GPIO_TypeDef* digit_ports[NUMBER_OF_DIG] = {
   [0] = Q1_GPIO_Port,
@@ -106,7 +106,7 @@ static BtnCtx Button = {0}; /// Инициализировали перемен�
 /// Если кнопка у меня активный НУЛЬ - инвертируем (== GPIO_PIN_RESET)
 static inline BUTTON_STATE_t Butt_State_Read(void)
 {
-  return HAL_GPIO_ReadPin(K1_GPIO_Port, K1_Pin) == SET ? PUSH : RELEASED;
+  return HAL_GPIO_ReadPin(K1_GPIO_Port, K1_Pin) ==  GPIO_PIN_SET ? PUSH : RELEASED;
 }
 
 /// Опрос раз в 1 мс. Возвращаем одно событие либо EVENT_NONE
@@ -233,8 +233,6 @@ int main(void)
   Seg7_SetNumber(&seg7_handle, Machine_State.cfg_sec);
   Seg7_UpdateIndicator(&seg7_handle);
   HAL_TIM_Base_Start_IT(&htim3);
-
-  uint32_t last_tick_ms = 0U; /// Служебная переменная время последнего обновления
 
   uint32_t last_ms =     HAL_GetTick();  /// Для 1мс - сканера
   uint32_t last_tick1s = HAL_GetTick();  /// Для 1с - тика автомата

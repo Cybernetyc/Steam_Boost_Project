@@ -38,7 +38,8 @@ void Machine_Process (MachineState_Context_t* ctx, const MachineEvent_t event)
       {
         ctx->machine_state = STATE_COUNTDOWN; /// 1. Перейти в состояние COUNTDOWN
         ctx->cur_sec       = ctx->cfg_sec;    /// 2. Установить cur_sec = cfg_sec
-        ctx->valve_state   = OPEN;            /// 3. Включи клапан
+        ctx->valve_state   = OPEN;            /// 3. Контекст состояния клапана - ОТКРЫТ
+        Valve_Set(OPEN);          /// 4. ОТКРЫТЬ клапан
       }
       else if (event == EVENT_BTN_LONG_PRESS)
       {

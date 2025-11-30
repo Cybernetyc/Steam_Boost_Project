@@ -9,11 +9,10 @@
 AppFlashConfig_t GlobalAppConfig;
 
 /**
- * @brief Возвращает указатель на структуру конфигурации\n
- * расположенную во Flash - памяти.
+ * @brief Возвращает указатель на структуру конфигурации расположенную во Flash - памяти.
  * @details Static inline — встраивается компилятором для оптимизации производительности
  * @details Так же производится приведение типов адреса памяти к структуре
- * @retval константный Указатель (данные во Flash нельзя менять напрямую)
+ * @retval Константный указатель (данные во Flash нельзя менять напрямую).
  */
 static inline const AppFlashConfig_t* APP_Get_CFG_Addr(void)
 {
@@ -28,7 +27,7 @@ static inline const AppFlashConfig_t* APP_Get_CFG_Addr(void)
  *               Не должно быть NULL и содержать действительные данные.
  * @retval Валидность если данные проходят проверку, иначе инвалидность.
  */
-static validate APP_Check_CFG_Valid(const AppFlashConfig_t *config)
+static Validate_t APP_Check_CFG_Valid(const AppFlashConfig_t *config)
 {
   /// Проверка контрольных значений:
   /// Магическое число
@@ -105,7 +104,7 @@ static HAL_StatusTypeDef APP_Erase_CFG_Flash(void)
  * @details Выполняет последовательную запись 32-битных слов конфигурационной
  *          структуры в заданный адрес Flash-памяти
  * @param input_config Указатель на структуру с данными для записи
- * @retval HAL_StatusTypeDef Статус операции: HAL_OK при успехе, HAL_ERROR при ошибке
+ * @retval HAL_StatusTypeDef - Статус операции стирания
  */
 static HAL_StatusTypeDef APP_Write_CFG_Flash(const AppFlashConfig_t *input_config)
 {
@@ -243,7 +242,7 @@ void APP_Load_CFG_Flash(void)
 
   if (APP_Check_CFG_Valid(flashConfig) == VALID)
   {
-    GlobalAppConfig = *flashConfig; /// Почему сразу не использовать глобальную переменную ? В чём прикол ? Спросить у GPT
+    GlobalAppConfig = *flashConfig;
   }
   else
   {

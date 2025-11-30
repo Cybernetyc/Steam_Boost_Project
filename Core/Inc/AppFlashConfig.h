@@ -25,19 +25,17 @@
  *
  */
 
+/** Подключение заголовочных файлов */
 #include <stdint.h>
-
 #include "stm32f4xx_hal.h"
 
-/** Частные перечисления */
+/** Перечисления */
 
-/**
- * Перечисление для валидации данных
- */
+/** -- Перечисление для валидации данных */
 typedef enum {
     INVALID = 0,
       VALID = 1
-} validate;
+} Validate_t;
 
 
 /** Частные макроопределения */
@@ -60,9 +58,7 @@ typedef enum {
 
 
 
-/**
- *  Структура конфигурации
- */
+/** -- Структура конфигурации -- */
 typedef struct {
   /**
    * 32-битное "магическое" число, используемое в качестве идентификатора или маркера.
@@ -115,4 +111,4 @@ extern AppFlashConfig_t GlobalAppConfig;
 HAL_StatusTypeDef APP_Save_CFG_Flash(void);
 void APP_Load_CFG_Flash(void);
 
-#endif // INC_7_SEG_APPFLASHCONFIG_H //
+#endif //INC_7_SEG_APPFLASHCONFIG_H
