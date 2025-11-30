@@ -37,7 +37,7 @@ add_executable(${CMAKE_PROJECT_NAME}
         Core/Inc/7_seg_driver.h
         Core/Src/State_Machine.c
         Core/Src/AppFlashConfig.c
-        Core/Src/AppFlashConfig.h)
+        Core/Inc/AppFlashConfig.h)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)

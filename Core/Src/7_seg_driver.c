@@ -19,7 +19,7 @@ static const uint8_t digits_code[] = {
   [9] = 0x6F
 };
 
-/* Примеры символов (если понадобятся позже) */
+/* Примеры символов (если понадобятся позже) /
 static const uint8_t symbols_code[] = {
   [0] = 0x77, // A
   [1] = 0x7C, // b
@@ -28,7 +28,7 @@ static const uint8_t symbols_code[] = {
   [4] = 0x79, // E
   [5] = 0x71, // F
   [6] = 0x74, // h
-};
+}; */
 
 /**
  * @brief Initializes the structure that describes the 7-segment indicator.

@@ -224,10 +224,13 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
+
+  APP_Load_CFG();
+
+  Machine_State.cfg_sec = GlobalAppConfig.cfg_sec;
+
   Seg7_Init(&seg7_handle, digit_ports, digit_pins, segment_port, 0xFF);
-
   Seg7_SetNumber(&seg7_handle, Machine_State.cfg_sec);
-
   Seg7_UpdateIndicator(&seg7_handle);
   HAL_TIM_Base_Start_IT(&htim3);
 

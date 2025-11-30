@@ -5,16 +5,22 @@
 #include <State_Machine.h>
 #include <7_seg_driver.h>
 
+#include "AppFlashConfig.h"
+
 extern Seg7_Handle_t seg7_handle;
 
 static inline uint8_t cfg_next_3_6 (const uint8_t input_value)
 {
   switch (input_value)
   {
-    case DEFAULT_TIME:   return DEFAULT_TIME+1;
-    case (DEFAULT_TIME+1):  return DEFAULT_TIME+2; /// Спросить у GPT можно ли так
-    case 5:  return 6;
-    default: return 3; /// До 6 или любых иных значений
+    case DEFAULT_TIME:
+      return DEFAULT_TIME+1;
+    case DEFAULT_TIME+1:
+      return DEFAULT_TIME+2; /// Спросить у GPT можно ли так
+    case 5:
+      return 6;
+    default:
+      return 3; /// До 6 или любых иных значений
   }
 }
 
@@ -72,9 +78,14 @@ void Machine_Process (MachineState_Context_t* ctx, const MachineEvent_t event)
       {
         ctx->cur_sec = cfg_next_3_6(ctx->cur_sec); /// Шаг по кругу
       }
-      else if ( event == EVENT_BTN_LONG_PRESS)
+      else if (event == EVENT_BTN_LONG_PRESS)
       {
-        ctx->cfg_sec = ctx->cur_sec;
+        if (ctx->cfg_sec != ctx->cur_sec)
+        {
+          ctx->cfg_sec = ctx->cur_sec;
+          GlobalAppConfig.cfg_sec = ctx->cfg_sec; /// Обновили RAM-копию
+          APP_Save_CFG_Flash();
+        }
         ctx->machine_state = STATE_READY;
       }
     break;

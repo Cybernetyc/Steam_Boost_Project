@@ -2,8 +2,8 @@
 // Created by Dmitry on 29.11.2025.
 //
 
-#ifndef INC_7_SEG_APPFLASHСONFIG_H
-#define INC_7_SEG_APPFLASHСONFIG_H
+#ifndef INC_7_SEG_APPFLASHCONFIG_H
+#define INC_7_SEG_APPFLASHCONFIG_H
 
 /**
  *  -----------------------
@@ -25,9 +25,9 @@
  *
  */
 
-#include "stm32f4xx_hal_def.h"
-#include "State_Machine.h"
 #include <stdint.h>
+
+#include "stm32f4xx_hal.h"
 
 /** Частные перечисления */
 
@@ -43,18 +43,20 @@ typedef enum {
 /** Частные макроопределения */
 
 /** -- Контроль целостности **/
-#define APP_CFG_MAGIC   (0x0BADC0DE) /// Магическое число для валидации данных
-#define APP_CFG_VERSION (1)          /// Версия конфига
+#define APP_CFG_MAGIC   (0x0BADC0DEu) /// Магическое число для валидации данных
+#define APP_CFG_VERSION (1)           /// Версия конфига
 
 /** -- Значения по умолчанию -- */
 #define APP_CFG_SEC_DEFAULT (APP_CFG_SEC_MIN)
 
 /** -- Диапазоны значений данных в структуре -- */
-#define APP_CFG_SEC_MAX (APP_CFG_SEC_MIN + 3)     /// Максимальное значение
-#define APP_CFG_SEC_MIN (DEFAULT_TIME)            /// Минимальное  значение
+#define APP_CFG_SEC_MAX (6u)         /// Максимальное значение
+#define APP_CFG_SEC_MIN (3u)         /// Минимальное  значение
 
 /** -- Размещение памяти -- */
-#define APP_CFG_ADDR     ((uint32_t)(0x08020000)) /// S5 = 128 КБ, начало в 0х08020000
+#define FLASH_CFG_ADDR     ((uint32_t)(0x08020000u))  /// S5 = 128 КБ, начало в 0х08020000
+#define FLASH_CFG_SECTOR   (FLASH_SECTOR_5)           /// Сектор хранения данных
+#define FLASH_CFG_VRANGE   (FLASH_VOLTAGE_RANGE_3)    /// Диапазон напряжений для работы устройства: от 2,7 до 3,6 В
 
 
 
@@ -109,4 +111,8 @@ typedef struct {
  */
 extern AppFlashConfig_t GlobalAppConfig;
 
-#endif //INC_7_SEG_APPFLASHСONFIG_H
+/** Прототипы функций **/
+HAL_StatusTypeDef APP_Save_CFG_Flash(void);
+void APP_Load_CFG(void);
+
+#endif // INC_7_SEG_APPFLASHCONFIG_H //

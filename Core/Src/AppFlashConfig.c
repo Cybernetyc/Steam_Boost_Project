@@ -2,10 +2,23 @@
 // Created by Dmitry on 29.11.2025.
 //
 #include "AppFlashConfig.h"
-#include <strings.h>
+#include <string.h>
+#include "tim.h"
 
 /** Глобальная RAM копия данных */
 AppFlashConfig_t GlobalAppConfig;
+
+/**
+ * @brief Возвращает указатель на структуру конфигурации\n
+ * расположенную во Flash - памяти.
+ * @details Static inline — встраивается компилятором для оптимизации производительности
+ * @details Так же производится приведение типов адреса памяти к структуре
+ * @retval константный Указатель (данные во Flash нельзя менять напрямую)
+ */
+static inline const AppFlashConfig_t* APP_Get_CFG_Addr(void)
+{
+  return (const AppFlashConfig_t*)FLASH_CFG_ADDR;
+}
 
 /**
  * @brief Проверка предоставленной конфигурационной структуры на валидность:\n
@@ -15,44 +28,115 @@ AppFlashConfig_t GlobalAppConfig;
  *               Не должно быть NULL и содержать действительные данные.
  * @retval Валидность если данные проходят проверку, иначе инвалидность.
  */
-static validate Config_Valid(const AppFlashConfig_t *config)
+static validate APP_Check_CFG_Valid(const AppFlashConfig_t *config)
 {
-  if (config->magic   != APP_CFG_MAGIC   ||
-      config->version != APP_CFG_VERSION ||
-      config->cfg_sec  < APP_CFG_SEC_MIN ||
-      config->cfg_sec  > APP_CFG_SEC_MAX ||
-     ~config->cfg_sec != config->cfg_sec_inv)
+  /// Проверка контрольных значений:
+  /// Магическое число
+  if (config->magic   != APP_CFG_MAGIC)
   {
     return INVALID;
   }
-
+  /// Версия
+  if (config->version != APP_CFG_VERSION)
+  {
+    return INVALID;
+  }
+  /// Диапазон минимального значения
+  if (config->cfg_sec  < APP_CFG_SEC_MIN)
+  {
+    return INVALID;
+  }
+  /// Диапазон максимального значения
+  if (config->cfg_sec  > APP_CFG_SEC_MAX)
+  {
+    return INVALID;
+  }
+  /// Инвернсая копия для защиты от повреждённых данных
+  if (~config->cfg_sec != config->cfg_sec_inv)
+  {
+    return INVALID;
+  }
+  /// Вернуть валидность при успешной проверке
   return VALID;
 }
 
-/**
- * @brief Возвращает указатель на структуру конфигурации\n
- * расположенную во Flash - памяти.
- * @details Static inline — встраивается компилятором для оптимизации производительности
- * @details Так же производится приведение типов адреса памяти к структуре
- * @retval константный Указатель (данные во Flash нельзя менять напрямую)
- */
-static inline const AppFlashConfig_t* flash_cfg(void)
+/// Стирание памяти 5-го сектора. Всё в 0xFF
+static HAL_StatusTypeDef APP_Erase_CFG_Flash(void)
 {
-  return (const AppFlashConfig_t*)APP_CFG_ADDR;
+  uint32_t Error = 0;
+  FLASH_EraseInitTypeDef EraseInitStruct = {0};
+
+  /// Настройка параметров стирания сектора Flash памяти
+  EraseInitStruct.TypeErase    = FLASH_TYPEERASE_SECTORS;  /// Тип стирания - секторами
+  EraseInitStruct.Sector       = FLASH_CFG_SECTOR;         /// Номер сектора ( определён в хедере )
+  EraseInitStruct.NbSectors    = 1;                        /// Стираем только 1 сектор
+  EraseInitStruct.VoltageRange = FLASH_CFG_VRANGE;         /// Диапазон напряжений
+
+  __HAL_FLASH_CLEAR_FLAG( FLASH_FLAG_EOP    | FLASH_FLAG_OPERR  |
+                          FLASH_FLAG_WRPERR | FLASH_FLAG_PGAERR |
+                          FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR )
+  ;
+
+  return HAL_FLASHEx_Erase(&EraseInitStruct, &Error);
 }
 
-/* Запись:
-    1. Остановили мультиплекс
-    2. UNLOCK   FLASH
-    3. ERASE    FLASH
-    4. PROGRAMM FLASH
-    5. LOCK     FLASH */
-HAL_StatusTypeDef AppFlash_SaveConfig(void)
+/**
+ * @brief Записывает конфигурационную структуру во Flash-память машинными словами.
+ * @details Выполняет последовательную запись 32-битных слов конфигурационной
+ *          структуры в заданный адрес Flash-памяти
+ * @param input_config Указатель на структуру с данными для записи
+ * @retval HAL_StatusTypeDef Статус операции: HAL_OK при успехе, HAL_ERROR при ошибке
+ */
+static HAL_StatusTypeDef APP_Write_CFG_Flash(const AppFlashConfig_t *input_config)
 {
-  /* 0. Защита диапазона и инверсия - на всякий случай */
+  /// Преобразуем указатель на структуру в указатель на массив 32-битных слов
+  /// Это необходимо т.к. Flash память программируется словами (32 бита)
+  const uint32_t *local_config_pointer = (const uint32_t *)input_config;
+
+  /// Адрес во Flash-памяти, куда будет производиться запись
+  uint32_t address = FLASH_CFG_ADDR;
+
+  /// Вычисляем количество 32-битных слов в структуре конфигурации
+  /// Деление на 4u (sizeof(uint32_t)) - т.к. работаем с 32-битными словами
+  const uint32_t numbers_of_word = (uint32_t)((sizeof(*input_config)+3u)/4u);
+
+  /// Последовательная запись каждого слова конфигурации во Flash
+  for (uint32_t i = 0; i < numbers_of_word; i++)
+  {
+    /**
+     * Программируем очередное 32-битное слово во Flash-память
+     * FLASH_TYPEPROGRAM_WORD - указывает на программирование одного слова
+     * address - базовый адрес
+     * local_config_pointer[i] - текущее слово данных для записи
+     */
+    if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address, local_config_pointer[i]) != HAL_OK)
+    {
+      return HAL_ERROR;  /// При любой ошибке программирования - немедленный выход
+    }
+    address += 4u;
+  }
+  /// Все слова успешно записаны
+  return HAL_OK;
+}
+
+
+/**
+ * @brief Сохраняет конфигурацию во Flash-память
+ * @details Выполняет полный цикл сохранения:\n
+ *  -- подготовка данных\n
+ *  -- проверка необходимости записи\n
+ *  -- стирание сектора\n
+ *  -- запись и верификация\n
+ *  -- Операция защищена от прерываний.\n
+ *
+ * @retval HAL_StatusTypeDef Статус операции сохранения
+ */
+HAL_StatusTypeDef APP_Save_CFG_Flash(void)
+{
+  /// 0. Защита диапазона и инверсия - на всякий случай
   if (GlobalAppConfig.cfg_sec < APP_CFG_SEC_MIN)
   {
-    GlobalAppConfig.cfg_sec = APP_CFG_SEC_MIN;
+      GlobalAppConfig.cfg_sec = APP_CFG_SEC_MIN;
   }
   if (GlobalAppConfig.cfg_sec > APP_CFG_SEC_MAX)
   {
@@ -64,9 +148,49 @@ HAL_StatusTypeDef AppFlash_SaveConfig(void)
   GlobalAppConfig.reserved_1  = 0u;
   GlobalAppConfig.reserved_2  = 0u;
 
+  /// 1. Если данные уже лежат во Flash, то ничего не копируем
+  AppFlashConfig_t const *CurFlashConfig = APP_Get_CFG_Addr();
 
+  if (APP_Check_CFG_Valid(CurFlashConfig) == VALID &&
+      memcmp(CurFlashConfig, &GlobalAppConfig, sizeof(GlobalAppConfig)) == 0)
+  {
+    return HAL_OK;
+  }
 
-  return 0;
+  /// 2. На время erase программ выключаем TIM3-IRQ (мультиплекс) и делаем участок атомарным*/
+  // extern TIM_HandleTypeDef htim3;
+  HAL_TIM_Base_Stop_IT(&htim3);
+  __disable_irq();
+
+  /// 3. Разблокируем FLASH для последующей операции над ним */
+  HAL_StatusTypeDef App_CurrStatus = HAL_FLASH_Unlock();
+
+  /// В случае неудачи восстанавливаем прерывания и запускаем таймер для мультиплексирования
+  if (App_CurrStatus != HAL_OK)
+  {
+    __enable_irq();
+    HAL_TIM_Base_Start_IT(&htim3);
+    return App_CurrStatus;
+  }
+
+  App_CurrStatus = APP_Erase_CFG_Flash();
+  if (App_CurrStatus == HAL_OK)
+  {
+    App_CurrStatus = APP_Write_CFG_Flash(&GlobalAppConfig);
+  }
+
+  /// Если успешно стёрли и записали
+  (void)HAL_FLASH_Lock();
+  __enable_irq();
+  HAL_TIM_Base_Start_IT(&htim3);
+
+  /// Быстрая верификация
+  if (App_CurrStatus == HAL_OK && APP_Check_CFG_Valid(APP_Get_CFG_Addr())!= VALID)
+  {
+    App_CurrStatus = HAL_ERROR;
+  }
+
+  return App_CurrStatus; /// Вернули текущий статус
 }
 
 /**
@@ -86,11 +210,11 @@ HAL_StatusTypeDef AppFlash_SaveConfig(void)
  * - В случае не валидности - инициализация конфигурации значениями по умолчанию
  *   и сохранение в память.
  */
-void AppFlash_LoadConfig(void)
+void APP_Load_CFG(void)
 {
-    const AppFlashConfig_t *flashConfig = flash_cfg();
+    const AppFlashConfig_t *flashConfig = APP_Get_CFG_Addr();
 
-  if (Config_Valid(flashConfig) == VALID)
+  if (APP_Check_CFG_Valid(flashConfig) == VALID)
   {
     GlobalAppConfig = *flashConfig; /// Почему сразу не использовать глобальную переменную ? В чём прикол ? Спросить у GPT
   }
@@ -102,6 +226,6 @@ void AppFlash_LoadConfig(void)
     GlobalAppConfig.cfg_sec_inv = ~GlobalAppConfig.cfg_sec;
     GlobalAppConfig.reserved_1  = 0u;
     GlobalAppConfig.reserved_2  = 0u;
-    (void)AppFlash_SaveConfig();       /// Первый старт прошивки или битый блок - записали дефолтное значение
+    (void)APP_Save_CFG_Flash();       /// Первый старт прошивки или битый блок - записали дефолтное значение
   }
 }
