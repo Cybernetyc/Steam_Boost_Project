@@ -81,6 +81,8 @@ void Error_Handler(void);
 #define Q3_GPIO_Port GPIOB
 #define K1_Pin GPIO_PIN_10
 #define K1_GPIO_Port GPIOB
+#define VALVE_Pin GPIO_PIN_12
+#define VALVE_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

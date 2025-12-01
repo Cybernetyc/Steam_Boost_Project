@@ -26,19 +26,17 @@
 #include "7_seg_driver.h"
 #include "State_Machine.h"
 #include "AppFlashConfig.h"
+#include "Button.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-typedef enum{
-  RELEASED = 0,
-  PUSH = 1
-} BUTTON_STATE_t;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define TIME (2)
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -65,7 +63,6 @@ uint16_t digit_pins[NUMBER_OF_DIG] = {
 /* Порт сегментов: весь порт A отдан под сегменты (как ты описывал) */
 GPIO_TypeDef* segment_port = GPIOA;
 
-
 MachineState_Context_t Machine_State = {
   .machine_state = STATE_READY,
   .valve_state   = CLOSED,
@@ -73,8 +70,7 @@ MachineState_Context_t Machine_State = {
   .cur_sec       = 0
 };
 
-MachineEvent_t Machine_Event = EVENT_NONE;
-
+//MachineEvent_t Machine_Event = EVENT_NONE;
 
 /* USER CODE END PV */
 
@@ -84,16 +80,15 @@ void SystemClock_Config(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
-
 /* USER CODE BEGIN 0 */
-
+/*
 //--- Настройка сканера ---
 #define BTN_DEBOUNCE_MS (20)    /// Антридребезг: сколько мс подряд уровень должен быть неизменным
 #define BTN_LONG_MS     (1000)  /// Порог длительного нажатия МС
 
 //--- Контекст кнопки ---
 typedef struct {
-  BUTTON_STATE_t  state     ; /// Текущее подтверждённое (после дебаунса) состояние кнопки: 1 - нажата. 0 - отпущена
+  ButtonState_t  state     ; /// Текущее подтверждённое (после дебаунса) состояние кнопки: 1 - нажата. 0 - отпущена
   uint8_t         long_state ; /// Флаг - длинное нажатие уже создано в этом удержании, чтобы не дублировать.
   uint16_t        stable_time_ms ; /// Время мс подряд "сырое" чтение не менялось (доказательство стабильности)
   uint16_t        hold_ms   ; /// Длительность текущего удержания (считаем только когда state == 1)
@@ -104,7 +99,7 @@ static ButtonContext_t Button = {0}; /// Инициализировали пер
 
 /// СЫРОЕ чтение GPIO: Возвращаем состояние кнопки, НАЖАТА или ОТПУЩЕНА.
 /// Если кнопка у меня активный НУЛЬ - инвертируем (== GPIO_PIN_RESET)
-static inline BUTTON_STATE_t Butt_State_Read(void)
+static inline ButtonState_t Button_Read_Raw(void)
 {
   return HAL_GPIO_ReadPin(K1_GPIO_Port, K1_Pin) ==  GPIO_PIN_SET ? PUSH : RELEASED;
 }
@@ -121,10 +116,10 @@ static inline BUTTON_STATE_t Butt_State_Read(void)
 ///
 static MachineEvent_t Button_Poll_1ms(void)
 {
-  static BUTTON_STATE_t Prev_State;
-  const  BUTTON_STATE_t Curr_State = Butt_State_Read();
+  static ButtonState_t Prev_State;
+  const  ButtonState_t Curr_State = Button_Read_Raw();
 
-  static BUTTON_STATE_t Init_State = 0;
+  static ButtonState_t Init_State = 0;
 
   if (!Init_State){                      /// Инициализация начального состояния кнопки
     Prev_State            = Curr_State;
@@ -192,7 +187,7 @@ static MachineEvent_t Button_Poll_1ms(void)
   return event;
 }
 
-
+*/
 /* USER CODE END 0 */
 
 /**
@@ -226,12 +221,14 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   APP_Load_CFG_Flash();
-
   Machine_State.cfg_sec = GlobalAppConfig.cfg_sec;
 
   Seg7_Init(&seg7_handle, digit_ports, digit_pins, segment_port, 0xFF);
   Seg7_SetNumber(&seg7_handle, Machine_State.cfg_sec);
   Seg7_UpdateIndicator(&seg7_handle);
+
+  Button_Init(K1_GPIO_Port, K1_Pin, HIGH);
+
   HAL_TIM_Base_Start_IT(&htim3);
 
   uint32_t last_ms =     HAL_GetTick();  /// Для 1мс - сканера
@@ -243,7 +240,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    uint32_t now = HAL_GetTick();
+    const uint32_t now = HAL_GetTick();
 
     /// --- Кнопка:  строгие 1 мс шаги; "догоняем', если главный цикл задержался ---///
     while (last_ms != now)
@@ -255,11 +252,11 @@ int main(void)
       {
         Machine_Process(&Machine_State, current_event);
       }
-
     }
 
     /// --- Секундный тик автомата ---
-    if ((now - last_tick1s) >= 1000){
+    if ((now - last_tick1s) >= 1000)
+    {
       last_tick1s += 1000;  /// Не приравнять к NOW, а прибавить 1000
       Machine_Process(&Machine_State, EVENT_TICK_1S);
     }
@@ -291,7 +288,12 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 80;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -301,9 +303,9 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV4;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
