@@ -39,7 +39,8 @@ add_executable(${CMAKE_PROJECT_NAME}
         Core/Src/AppFlashConfig.c
         Core/Inc/AppFlashConfig.h
         Core/Src/Button.c
-        Core/Inc/Button.h)
+        Core/Inc/Button.h
+        )
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)

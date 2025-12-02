@@ -9,6 +9,12 @@
 
 extern Seg7_Handle_t seg7_handle;
 
+static inline void Valve_Set (MachineState_Context_t* ctx, const Valve_State_t Valve_state_set)
+{
+  HAL_GPIO_WritePin(VALVE_GPIO_PORT, VALVE_PIN, (Valve_state_set ? GPIO_PIN_RESET : GPIO_PIN_SET));
+  ctx->valve_state = Valve_state_set;
+}
+
 static inline uint8_t cfg_next_3_6 (const uint8_t input_value)
 {
   switch (input_value)
@@ -37,13 +43,14 @@ void Machine_Process (MachineState_Context_t* ctx, const MachineEvent_t event)
       if (event == EVENT_BTN_SHRT_PRESS)
       {
         ctx->machine_state = STATE_COUNTDOWN; /// 1. Перейти в состояние обратного отсчёта
+
         ctx->cur_sec       = ctx->cfg_sec;    /// 2. Установить cur_sec = cfg_sec
-        ctx->valve_state   = OPEN;            /// 3. Контекст состояния клапана - ОТКРЫТ
-        Valve_Set(OPEN);          /// 4. ОТКРЫТЬ клапан
+        Valve_Set(ctx, OPEN);  /// 3. Изменить контекст состояния и открыть клапан
       }
       else if (event == EVENT_BTN_LONG_PRESS)
       {
         ctx->machine_state = STATE_CONFIG;     /// 1. Перейти в состояние настройки
+
         ctx->cur_sec       = ctx->cfg_sec;     /// 2. Редактируем с текущего.
       }
     break;
@@ -54,7 +61,8 @@ void Machine_Process (MachineState_Context_t* ctx, const MachineEvent_t event)
       if (event == EVENT_BTN_SHRT_PRESS)
       {
         ctx->machine_state  = STATE_READY;
-        ctx->valve_state    = CLOSED;
+        Valve_Set(ctx, CLOSED);
+        //ctx->valve_state    = CLOSED;
       }
 
       if (event == EVENT_TICK_1S)            /// Событие - 1 секунда
@@ -64,7 +72,8 @@ void Machine_Process (MachineState_Context_t* ctx, const MachineEvent_t event)
           ctx->cur_sec--;                    /// Уменьшить значение текущего времени если одно не 0
           if (ctx->cur_sec == 0)             /// Стало нулём ?
           {
-            ctx->valve_state = CLOSED;       /// Закрыли клапан
+            Valve_Set(ctx, CLOSED);
+            //ctx->valve_state = CLOSED;       /// Закрыли клапан
           }
         }
         else

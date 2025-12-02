@@ -8,6 +8,7 @@
 /** Подключение заголовочных файлов */
 #include "stdint.h"
 #include "stm32f4xx_hal.h"
+#include "main.h"
 
 /** Частные макроопределения */
 
@@ -15,8 +16,8 @@
 #define DEFAULT_TIME  (3)               // Значение времени по умолчанию для cfg_sec в Machine_State_Context
 
 /** -- Макроопределения для клапана -- */
-#define VALVE_GPIO_PORT (GPIOB)         // Порт клапана
-#define VALVE_GPIO_PIN  (GPIO_PIN_13)   // Пин клапана
+#define VALVE_GPIO_PORT (VALVE_GPIO_Port)  // Порт клапана
+#define VALVE_PIN       (VALVE_Pin)        // Пин клапана
 
 /** Перечисления */
 
@@ -45,7 +46,6 @@ typedef enum {
   OPEN   = 1                  // Клапана открыт
 } Valve_State_t;              // Состояние клапана
 
-
 /** Структуры */
 
 /** -- Структура контекста состояния машины -- */
@@ -57,13 +57,7 @@ typedef struct {
 } MachineState_Context_t;        /// Context of Machine State
 
 
-
 /** -- Прототипы функций -- */
 void Machine_Process (MachineState_Context_t* ctx, MachineEvent_t event);
-
-static inline void Valve_Set (const Valve_State_t Valve_state)
-{
-  HAL_GPIO_WritePin(VALVE_GPIO_PORT, VALVE_GPIO_PIN, (Valve_state ? GPIO_PIN_SET : GPIO_PIN_RESET));
-}
 
 #endif //INC_7_SEG_STATE_MACHINE_H
