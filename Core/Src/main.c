@@ -60,17 +60,19 @@ uint16_t digit_pins[NUMBER_OF_DIG] = {
   [2] = Q3_Pin
 };
 
-/* Порт сегментов: весь порт A отдан под сегменты (как ты описывал) */
+/** Порт сегментов: весь порт A отдан под сегменты */
 GPIO_TypeDef* segment_port = GPIOA;
 
+/**
+ * @brief Инициализация машины состояний
+ *        через инициализацию контекста.
+ */
 MachineState_Context_t Machine_State = {
   .machine_state = STATE_READY,
   .valve_state   = CLOSED,
   .cfg_sec       = DEFAULT_TIME,
   .cur_sec       = 0
 };
-
-//MachineEvent_t Machine_Event = EVENT_NONE;
 
 /* USER CODE END PV */
 

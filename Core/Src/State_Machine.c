@@ -1,11 +1,11 @@
-//
-// Created by Dmitry on 09.11.2025.
-//
+///
+/// Created by Dmitry on 09.11.2025.
+///
 
+/** Подключение заголовочных файлов */
 #include <State_Machine.h>
 #include <7_seg_driver.h>
-
-#include "AppFlashConfig.h"
+#include <AppFlashConfig.h>
 
 /**
   * @brief Дескриптор структуры для управления 7-сегментным индикатором.
@@ -19,7 +19,7 @@
 extern Seg7_Handle_t seg7_handle;
 
 /**
-  * @brief Устанавливает состояние клапана и обновляет контекст машины.
+  * @brief Функция для установки состояния клапана и обновления контекста машины состояний.
   *
   * @details Эта функция устанавливает контакт GPIO,
   * связанный с клапаном, в желаемое состояние и
@@ -38,47 +38,53 @@ static inline void Valve_Set (MachineState_Context_t* ctx, const Valve_State_t V
 }
 
 /**
-  * @brief Retrieves the next value based on a predefined sequence of input.
+  * @brief Функция изменения текущего числа из заранее заданной последовательности.
   *
-  * This function determines the next value in a circular sequence
-  * depending on the provided input value, with a default fall-through value
-  * if the input does not match any of the specific cases.
+  * @details Эта функция определяет следующее значение в круговой последовательности
+  *          в зависимости от предоставленного входного значения,
+  *          при этом по умолчанию придаётся значение fall-through,
+  *          если вход не совпадает ни с одним из конкретных
   *
-  * @param input_value The current value to evaluate and determine its next sequence value.
-  * @return The next value in the sequence. If the input value matches:
-  *         - DEFAULT_TIME, returns DEFAULT_TIME+1.
-  *         - DEFAULT_TIME+1, returns DEFAULT_TIME+2.
-  *         - 5, returns 6.
-  *         - Any other value, returns 3 as the default.
+  *
+  * @param input_value Текущее значение для оценки и определения следующего значения последовательности.
+  * @return Следующее значение в последовательности.
+  *         Если входное значение совпадает:
+  *         - DEFAULT_TIME+0, возвращает DEFAULT_TIME+1.
+  *         - DEFAULT_TIME+1, возвращает DEFAULT_TIME+2.
+  *         - DEFAULT_TIME+2, возвращает DEFAULT_TIME+3.
+  *         - Любое другое значение возвращает 3 по умолчанию.
   */
 static inline uint8_t cfg_next_3_6 (const uint8_t input_value)
 {
   switch (input_value)
   {
-    case DEFAULT_TIME:
+    case DEFAULT_TIME+0:
       return DEFAULT_TIME+1;
     case DEFAULT_TIME+1:
-      return DEFAULT_TIME+2; /// Спросить у GPT можно ли так
-    case 5:
-      return 6;
+      return DEFAULT_TIME+2;
+    case DEFAULT_TIME+3:
+      return DEFAULT_TIME+4;
     default:
-      return 3; /// До 6 или любых иных значений
+      return DEFAULT_TIME+0;
   }
 }
 
-
 /**
-  * @brief Processes the state machine transitions and actions based on the current state and events.
+  * @brief Функция обработки переходов и действий машины состояний на основе текущего состояния и событий.
   *
-  * This function manages state transitions for a state machine, which can operate in three primary
-  * modes: READY, COUNTDOWN, and CONFIG. Actions are performed depending on the current state and
-  * received event, including updating the machine's state, opening or closing a valve, modifying
-  * configuration values, and updating a seven-segment display.
+  * @details Эта функция управляет переходами состояний для машины состояний,
+  *          которая может работать в трёх основных режимах:
+  *          - READY
+  *          - COUNTDOWN
+  *          - CONFIG.
+  *           Действия выполняются в зависимости от: текущего состояния и полученного события,
+  *           включая обновление состояния машины, открытие или закрытие клапана,
+  *           изменение конфигурационных значений и обновление семи сегментного индикатора.
   *
-  * @param ctx Pointer to the machine state context structure, which contains information
-  *        about the machine's current state and configuration.
-  * @param event The current event triggering the state machine to process, such as a button press
-  *        or a timer tick.
+  * @param ctx Указатель на структуру контекста состояния машины,
+  *            которая содержит информацию о текущем состоянии и конфигурации машины.
+  * @param event Текущее событие, запускающее обработку в машине состояний,
+  *              например, нажатие кнопки или тик-таймер.
   */
 void Machine_Process (MachineState_Context_t* ctx, const MachineEvent_t event)
 {
@@ -107,7 +113,7 @@ void Machine_Process (MachineState_Context_t* ctx, const MachineEvent_t event)
       {
         ctx->machine_state  = STATE_READY;
         Valve_Set(ctx, CLOSED);
-        //ctx->valve_state   = CLOSED;
+        //ctx->valve_state = CLOSED;
       }
 
       if (event == EVENT_TICK_1S)            /// Событие - 1 секунда
