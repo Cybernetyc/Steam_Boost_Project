@@ -29,15 +29,18 @@ typedef struct {
   uint16_t      segment_pin_mask;
 } Seg7_Handle_t;
 
-/// Инициализация дескриптора индикатора
+/**
+ * @brief Инициализация дескриптора индикатора
+ */
 void Seg7_Init(
   Seg7_Handle_t* seg7_handle,
-  GPIO_TypeDef*  digit_ports[],     // массив указателей на порты разрядов
-  const uint16_t digit_pins[],      // массив пинов разрядов
-  GPIO_TypeDef*  segment_port,      // порт сегментов (общий)
-  uint16_t       segment_pin_mask   // маска задействованных бит сегментов
+  GPIO_TypeDef*  digit_ports[],     /// Массив указателей на порты разрядов
+  const uint16_t digit_pins[],      /// Массив пинов разрядов
+  GPIO_TypeDef*  segment_port,      /// Порт сегментов (общий)
+  uint16_t       segment_pin_mask   /// Маска задействованных бит сегментов
 );
 
+/// Прототипы функций.
 /// Заполнение буфера сегментов по числу (выравнивание по правому краю)
 void Seg7_SetNumber(Seg7_Handle_t* seg7_handle, uint16_t input_number);
 void Seg7_UpdateIndicator(Seg7_Handle_t *seg7_handle);
